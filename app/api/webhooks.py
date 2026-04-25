@@ -22,7 +22,12 @@ async def evolution_webhook(request: Request):
 
     data = payload.get("data", {})
     remote_jid = data.get("key", {}).get("remoteJid", "")
-    if remote_jid != settings.group_jid:
+    oberdan_jid = f"{settings.oberdan_phone}@s.whatsapp.net"
+
+    is_group = remote_jid == settings.group_jid
+    is_private_from_oberdan = remote_jid == oberdan_jid
+
+    if not is_group and not is_private_from_oberdan:
         return {"status": "ignored"}
 
     if data.get("key", {}).get("fromMe", False):
@@ -30,7 +35,7 @@ async def evolution_webhook(request: Request):
 
     # Fire and forget — return 200 immediately so Evolution API doesn't retry
     try:
-        await handle_incoming_message(payload)
+        await handle_incoming_message(payload, remote_jid=remote_jid)
     except Exception:
         logger.exception("Unhandled error processing webhook")
 

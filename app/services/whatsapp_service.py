@@ -20,3 +20,14 @@ async def send_group_message(text: str) -> None:
         response = await client.post(url, json=body, headers=headers)
         response.raise_for_status()
         logger.info("Message sent to group (%d chars)", len(text))
+
+
+async def send_private_message(phone: str, text: str) -> None:
+    url = f"{settings.evolution_api_url}/message/sendText/{settings.evolution_instance_name}"
+    headers = {"apikey": settings.evolution_api_key}
+    body = {"number": phone, "text": text}
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(url, json=body, headers=headers)
+        response.raise_for_status()
+        logger.info("Private message sent to %s (%d chars)", phone, len(text))

@@ -9,7 +9,9 @@ from app.db.repositories import participant_repo, workout_repo, pending_message_
 logger = logging.getLogger(__name__)
 
 
-async def handle_incoming_message(payload: dict) -> None:
+async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None:
+    from app.core.config import settings
+
     sender_phone = message_parser.extract_sender_phone(payload)
     if not sender_phone:
         return
@@ -20,11 +22,14 @@ async def handle_incoming_message(payload: dict) -> None:
 
     message_data = payload.get("data", {}).get("message") or {}
 
+    is_private = remote_jid and remote_jid != settings.group_jid
+    reply_phone = participant["phone"] if is_private else None
+
     # Route admin commands before workout processing
     if participant.get("is_admin"):
         for text in message_parser.extract_text_candidates(message_data):
             if admin_handler.is_admin_command(text):
-                await admin_handler.handle_admin_command(text, participant)
+                await admin_handler.handle_admin_command(text, participant, reply_phone=reply_phone)
                 return
     message_id = message_parser.extract_message_id(payload)
     submitted_at = message_parser.extract_timestamp(payload)

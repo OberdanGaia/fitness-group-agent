@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 async def send_group_message(text: str) -> None:
+    if settings.silent_mode:
+        logger.info("SILENT_MODE active — message suppressed (%d chars)", len(text))
+        return
+
     url = f"{settings.evolution_api_url}/message/sendText/{settings.evolution_instance_name}"
     headers = {"apikey": settings.evolution_api_key}
     body = {"number": settings.group_jid, "text": text}

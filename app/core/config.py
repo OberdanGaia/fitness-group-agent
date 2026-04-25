@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     oberdan_phone: str
     timezone: str = "America/Sao_Paulo"
     debug: bool = False
+    silent_mode: bool = False
 
     class Config:
         env_file = ".env"

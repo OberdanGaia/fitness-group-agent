@@ -71,8 +71,25 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     ranking_lines = []
     for i, r in enumerate(ranking):
         pct = round(r["count"] / r["goal"] * 100) if r["goal"] else 0
-        ranking_lines.append(f"{i + 1}. {r['name']}: {r['count']}/{r['goal']} treinos ({pct}%)")
+        ranking_lines.append(f"{i + 1}. {r['name']}: {r['count']}/{r['goal']} ({pct}%)")
     ranking_text = "\n".join(ranking_lines)
+
+    pelotoes_text = ""
+    if last_snapshot:
+        prev = {r["name"]: r["count"] for r in last_snapshot}
+        deltas = [(r, r["count"] - prev.get(r["name"], 0)) for r in ranking]
+        deltas_sorted = sorted(deltas, key=lambda x: x[1], reverse=True)
+
+        on_fire = [r["name"] for r, d in deltas_sorted if d >= 2][:5]
+        losing_pace = [
+            r["name"] for r, d in deltas
+            if prev.get(r["name"], 0) >= 30 and d == 0
+        ]
+
+        if on_fire:
+            pelotoes_text += f"\nPELOTÃO ON FIRE (mais treinos desde o último relatório): {', '.join(on_fire)}\n"
+        if losing_pace:
+            pelotoes_text += f"\nPELOTÃO RECARREGANDO (tinham boa sequência mas não treinaram desde o último relatório): {', '.join(losing_pace)}\n"
 
     milestones = _detect_new_milestones(ranking, last_snapshot)
     milestones_text = ""
@@ -83,15 +100,18 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         f"Você é o agente do Fitness 2026, um grupo de amigos numa aposta fitness no WhatsApp. "
         f"Gere o relatório do grupo. Hoje é {today.strftime('%d/%m/%Y')}.\n\n"
         f"PROGRESSO ATUAL (use EXATAMENTE esses números, sem alterar nenhum valor):\n{ranking_text}\n"
+        f"{pelotoes_text}"
         f"{milestones_text}\n"
         f"REGRAS (siga à risca):\n"
-        f"- Mostre a lista completa com os números EXATOS acima — nunca invente ou arredonde\n"
-        f"- A competição é cada pessoa contra ela mesma: o objetivo é bater os próprios 200 treinos, não superar os outros\n"
-        f"- NÃO destaque quem treinou mais nem crie senso de disputa entre participantes\n"
-        f"- Reconheça o progresso individual de forma positiva e bem-humorada\n"
-        f"- Tom descontraído, leve e engraçado — humor sutil, sem forçar\n"
+        f"- Mostre a lista completa com os números EXATOS acima — nunca adicione a palavra 'treinos' após os números\n"
+        f"- A competição é cada pessoa contra ela mesma: o objetivo é bater os próprios 200, não superar os outros\n"
+        f"- NÃO crie senso de disputa entre participantes\n"
+        f"- Se houver 'PELOTÃO ON FIRE' acima, crie uma seção animada celebrando quem mais treinou no período\n"
+        f"- Se houver 'PELOTÃO RECARREGANDO' acima, mencione com humor leve e carinhoso — uma zoeira gentil, nada pesado\n"
+        f"- NÃO mencione nem insinue nada sobre quem está há muito tempo sem treinar além do que está listado nos pelotões\n"
         f"- Se houver conquistas listadas acima, inclua seção '🏅 Conquistas' no final\n"
-        f"- Máximo 30 linhas, use emojis com moderação\n"
+        f"- Tom descontraído, engraçado e motivador — humor sutil e carinhoso\n"
+        f"- Máximo 35 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"
         f"- Escreva em português brasileiro informal\n"
         f"- Termine com uma frase motivacional curta e engraçada\n\n"

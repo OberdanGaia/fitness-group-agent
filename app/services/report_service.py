@@ -34,6 +34,7 @@ def _get_ranking() -> list[dict]:
         .select("participant_id")
         .eq("is_valid", True)
         .is_("deleted_at", "null")
+        .limit(10000)
         .execute()
     )
     workouts = workouts_result.data or []

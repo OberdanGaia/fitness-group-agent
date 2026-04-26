@@ -6,7 +6,7 @@ import pytz
 
 from app.core.constants import SHIFTS
 
-WORKOUT_PATTERN = re.compile(r'\b(\d{1,3})/200\b', re.IGNORECASE)
+WORKOUT_PATTERN = re.compile(r'\b(\d{1,3})[/:\-.]200\b', re.IGNORECASE)
 
 
 def extract_sequence_number(text: str) -> Optional[int]:

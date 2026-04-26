@@ -58,6 +58,21 @@ def _get_ranking() -> list[dict]:
     return ranking
 
 
+MILESTONES = {25: "25% da meta", 50: "metade da meta!", 75: "75% da meta", 100: "meta batida! 🏆"}
+
+
+def _detect_new_milestones(ranking: list[dict], last_snapshot: Optional[list]) -> list[str]:
+    prev = {r["name"]: r["count"] for r in last_snapshot} if last_snapshot else {}
+    achievements = []
+    for r in ranking:
+        prev_count = prev.get(r["name"], 0)
+        for pct, label in MILESTONES.items():
+            threshold = max(round(r["goal"] * pct / 100), 1)
+            if r["count"] >= threshold and prev_count < threshold:
+                achievements.append(f"- {r['name']} chegou aos {label} ({r['count']}/{r['goal']})")
+    return achievements
+
+
 def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     today = date.today()
 
@@ -72,26 +87,29 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         prev = {r["name"]: r["count"] for r in last_snapshot}
         deltas = [(r, r["count"] - prev.get(r["name"], 0)) for r in ranking]
         on_fire = max(deltas, key=lambda x: x[1])
-        stagnated = [r["name"] for r, d in deltas if d == 0 and r["count"] > 0]
-        comparison_text = (
-            f"\nDesde o último relatório:\n"
-            f"- 🔥 On Fire: {on_fire[0]['name']} (+{on_fire[1]} treinos)\n"
-            f"- 😴 Sem treinos no período: {', '.join(stagnated) if stagnated else 'ninguém (incrível!)'}\n"
-        )
+        if on_fire[1] > 0:
+            comparison_text = f"\nDestaque do período: {on_fire[0]['name']} foi quem mais treinou (+{on_fire[1]} treinos).\n"
+
+    milestones = _detect_new_milestones(ranking, last_snapshot)
+    milestones_text = ""
+    if milestones:
+        milestones_text = "\nConquistas desde o último relatório:\n" + "\n".join(milestones) + "\n"
 
     return (
         f"Você é o agente do Fitness 2026, um grupo de amigos numa aposta fitness no WhatsApp. "
-        f"Gere o relatório mensal do grupo. Hoje é {today.strftime('%d/%m/%Y')}. "
-        f"A meta é completar os treinos marcados até 20/12/2026.\n\n"
-        f"Ranking atual:\n{ranking_text}\n"
-        f"{comparison_text}\n"
-        f"Regras de formato:\n"
-        f"- Tom leve, engraçado e motivacional — o objetivo é animar, não envergonhar\n"
-        f"- Use emojis com moderação\n"
-        f"- Máximo 35 linhas\n"
+        f"Gere o relatório do grupo. Hoje é {today.strftime('%d/%m/%Y')}.\n\n"
+        f"RANKING ATUAL (use EXATAMENTE esses números, sem alterar nenhum valor):\n{ranking_text}\n"
+        f"{comparison_text}"
+        f"{milestones_text}\n"
+        f"REGRAS (siga à risca):\n"
+        f"- Mostre o ranking completo com os números EXATOS acima — nunca invente ou arredonde\n"
+        f"- Tom simples, direto e levemente engraçado — sem exagerar nas piadinhas\n"
+        f"- Reconheça positivamente quem está evoluindo\n"
+        f"- Se houver conquistas listadas acima, inclua seção '🏅 Conquistas' no final\n"
+        f"- Máximo 30 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"
         f"- Escreva em português brasileiro informal\n"
-        f"- Termine com uma frase motivacional curta para o mês\n\n"
+        f"- Termine com uma frase motivacional curta\n\n"
         f"Gere o relatório agora:"
     )
 

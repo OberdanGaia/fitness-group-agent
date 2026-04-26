@@ -125,6 +125,7 @@ async def generate_report(
     last_snapshot = last_report["snapshot"] if last_report else None
 
     prompt = _build_prompt(ranking, last_snapshot)
+    logger.info("Ranking snapshot: %s", [(r["name"], r["count"]) for r in ranking])
     logger.info("Generating report via Gemini (trigger=%s)", trigger)
 
     response = await client.aio.models.generate_content(

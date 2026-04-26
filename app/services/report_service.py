@@ -29,20 +29,11 @@ def _get_ranking() -> list[dict]:
     )
     participants = participants_result.data or []
 
-    workouts_result = (
-        supabase.table("workouts")
-        .select("participant_id")
-        .eq("is_valid", True)
-        .is_("deleted_at", "null")
-        .limit(10000)
-        .execute()
-    )
-    workouts = workouts_result.data or []
-
-    counts: dict[str, int] = {}
-    for w in workouts:
-        pid = w["participant_id"]
-        counts[pid] = counts.get(pid, 0) + 1
+    counts_result = supabase.rpc("get_workout_counts").execute()
+    counts: dict[str, int] = {
+        row["participant_id"]: row["count"]
+        for row in (counts_result.data or [])
+    }
 
     ranking = []
     for p in participants:

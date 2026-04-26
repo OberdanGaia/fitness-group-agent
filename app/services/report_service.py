@@ -74,14 +74,6 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         ranking_lines.append(f"{i + 1}. {r['name']}: {r['count']}/{r['goal']} treinos ({pct}%)")
     ranking_text = "\n".join(ranking_lines)
 
-    comparison_text = ""
-    if last_snapshot:
-        prev = {r["name"]: r["count"] for r in last_snapshot}
-        deltas = [(r, r["count"] - prev.get(r["name"], 0)) for r in ranking]
-        on_fire = max(deltas, key=lambda x: x[1])
-        if on_fire[1] > 0:
-            comparison_text = f"\nDestaque do período: {on_fire[0]['name']} foi quem mais treinou (+{on_fire[1]} treinos).\n"
-
     milestones = _detect_new_milestones(ranking, last_snapshot)
     milestones_text = ""
     if milestones:
@@ -90,18 +82,19 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     return (
         f"Você é o agente do Fitness 2026, um grupo de amigos numa aposta fitness no WhatsApp. "
         f"Gere o relatório do grupo. Hoje é {today.strftime('%d/%m/%Y')}.\n\n"
-        f"RANKING ATUAL (use EXATAMENTE esses números, sem alterar nenhum valor):\n{ranking_text}\n"
-        f"{comparison_text}"
+        f"PROGRESSO ATUAL (use EXATAMENTE esses números, sem alterar nenhum valor):\n{ranking_text}\n"
         f"{milestones_text}\n"
         f"REGRAS (siga à risca):\n"
-        f"- Mostre o ranking completo com os números EXATOS acima — nunca invente ou arredonde\n"
-        f"- Tom simples, direto e levemente engraçado — sem exagerar nas piadinhas\n"
-        f"- Reconheça positivamente quem está evoluindo\n"
+        f"- Mostre a lista completa com os números EXATOS acima — nunca invente ou arredonde\n"
+        f"- A competição é cada pessoa contra ela mesma: o objetivo é bater os próprios 200 treinos, não superar os outros\n"
+        f"- NÃO destaque quem treinou mais nem crie senso de disputa entre participantes\n"
+        f"- Reconheça o progresso individual de forma positiva e bem-humorada\n"
+        f"- Tom descontraído, leve e engraçado — humor sutil, sem forçar\n"
         f"- Se houver conquistas listadas acima, inclua seção '🏅 Conquistas' no final\n"
         f"- Máximo 30 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"
         f"- Escreva em português brasileiro informal\n"
-        f"- Termine com uma frase motivacional curta\n\n"
+        f"- Termine com uma frase motivacional curta e engraçada\n\n"
         f"Gere o relatório agora:"
     )
 

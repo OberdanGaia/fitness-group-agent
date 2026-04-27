@@ -30,6 +30,12 @@ WORKOUTS = {
     "Du":         50,
     "Ste":        72,
     "Iago":       17,
+    "Piazzi":     105,
+    "Gui Pacheco": 83,
+    "Valentina":  37,
+    "Gabie":      35,
+    "Julia":      26,
+    "Natan":      17,
 }
 
 

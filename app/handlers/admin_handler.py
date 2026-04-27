@@ -1,7 +1,10 @@
 import logging
 
+import httpx
+
 from app.db.repositories import report_repo
 from app.services import report_service, whatsapp_service
+from app.services.report_service import ReportError
 
 logger = logging.getLogger(__name__)
 
@@ -31,5 +34,16 @@ async def _handle_relatorio(participant: dict, reply_phone: str = None) -> None:
             await whatsapp_service.send_group_message(report_text)
         if saved:
             report_repo.mark_sent(saved["id"])
+    except ReportError as e:
+        logger.error("Report error (service=%s): %s", e.service, e)
+        error_msg = f"⚠️ Erro ao gerar relatório — serviço indisponível: *{e.service}*. Tente novamente em alguns minutos."
+        if reply_phone:
+            await whatsapp_service.send_private_message(reply_phone, error_msg)
+    except httpx.HTTPError as e:
+        logger.error("WhatsApp send error: %s", e)
+        if reply_phone:
+            await whatsapp_service.send_private_message(reply_phone, "⚠️ Erro ao enviar mensagem — serviço indisponível: *WhatsApp (Evolution API)*. Tente novamente em alguns minutos.")
     except Exception:
-        logger.exception("Failed to generate/send report for #relatorio command")
+        logger.exception("Unexpected error for #relatorio command")
+        if reply_phone:
+            await whatsapp_service.send_private_message(reply_phone, "⚠️ Erro inesperado ao gerar relatório. Verifique os logs no Railway.")

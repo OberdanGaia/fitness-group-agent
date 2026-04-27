@@ -119,24 +119,37 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     )
 
 
+class ReportError(Exception):
+    def __init__(self, service: str, message: str):
+        self.service = service
+        super().__init__(message)
+
+
 async def generate_report(
     trigger: str,
     triggered_by_id: Optional[str] = None,
 ) -> tuple[str, Optional[dict]]:
     client = genai.Client(api_key=settings.gemini_api_key)
 
-    ranking = _get_ranking()
-    last_report = report_repo.get_last_report()
+    try:
+        ranking = _get_ranking()
+        last_report = report_repo.get_last_report()
+    except Exception as e:
+        raise ReportError("banco de dados", str(e)) from e
+
     last_snapshot = last_report["snapshot"] if last_report else None
 
     prompt = _build_prompt(ranking, last_snapshot)
     logger.info("Ranking snapshot: %s", [(r["name"], r["count"]) for r in ranking])
     logger.info("Generating report via Gemini (trigger=%s)", trigger)
 
-    response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-    )
+    try:
+        response = await client.aio.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+        )
+    except Exception as e:
+        raise ReportError("Gemini (IA)", str(e)) from e
     report_text = response.text
 
     last_period_end = last_report["period_end"] if last_report else None

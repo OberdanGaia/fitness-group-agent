@@ -19,7 +19,7 @@ from app.core.config import settings
 from app.db.client import get_supabase
 from app.services.message_parser import extract_sequence_number, extract_text_candidates, get_shift
 
-WINDOW_DAYS = 14
+WINDOW_DAYS = 30
 BR_TZ = pytz.timezone("America/Sao_Paulo")
 
 
@@ -61,6 +61,14 @@ def load_registered_message_ids() -> set:
     return ids
 
 
+def _resolve_message(message_data: dict) -> dict:
+    """Retorna o conteúdo real da mensagem, desembrulhando edições se necessário."""
+    edited = message_data.get("editedMessage", {}).get("message")
+    if edited:
+        return edited
+    return message_data
+
+
 def insert_workout(participant: dict, message_id: str, submitted_at: datetime, sequence_number: int, has_photo: bool) -> None:
     shift = get_shift(submitted_at, settings.timezone)
     workout_date = submitted_at.astimezone(BR_TZ).date()
@@ -78,7 +86,7 @@ def insert_workout(participant: dict, message_id: str, submitted_at: datetime, s
 
 
 def main():
-    print("\n=== Auditoria de Treinos Perdidos (últimas 2 semanas) ===\n")
+    print("\n=== Auditoria de Treinos Perdidos (último mês) ===\n")
 
     print("Buscando mensagens do grupo via Evolution API...")
     try:
@@ -119,7 +127,7 @@ def main():
         if not participant:
             continue
 
-        message_data = msg.get("message") or {}
+        message_data = _resolve_message(msg.get("message") or {})
         texts = extract_text_candidates(message_data)
         has_photo = "imageMessage" in message_data
 
@@ -145,7 +153,7 @@ def main():
         })
 
     if not missed:
-        print("Nenhum treino perdido encontrado nos últimos 14 dias.")
+        print("Nenhum treino perdido encontrado no último mês.")
         return
 
     print(f"{'#':<4} {'Participante':<20} {'Seq':<6} {'Data/Hora':<20}")

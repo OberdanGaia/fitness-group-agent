@@ -63,7 +63,7 @@ def load_registered_message_ids() -> set:
 
 def load_registered_sequences() -> set:
     """Retorna conjunto de (participant_id, sequence_number) já no banco."""
-    result = get_supabase().table("workouts").select("participant_id,sequence_number").eq("is_valid", True).is_("deleted_at", "null").execute()
+    result = get_supabase().table("workouts").select("participant_id,sequence_number").eq("is_valid", True).is_("deleted_at", "null").limit(10000).execute()
     return {(row["participant_id"], row["sequence_number"]) for row in (result.data or [])}
 
 

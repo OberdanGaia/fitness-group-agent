@@ -61,10 +61,13 @@ def load_registered_message_ids() -> set:
     return ids
 
 
-def load_registered_sequences() -> set:
-    """Retorna conjunto de (participant_id, sequence_number) já no banco via RPC."""
+def load_registered_sequences() -> dict:
+    """Retorna dict {participant_id: set(sequence_numbers)} via RPC agrupado."""
     result = get_supabase().rpc("get_registered_sequences").execute()
-    return {(row["participant_id"], row["sequence_number"]) for row in (result.data or [])}
+    return {
+        row["participant_id"]: set(row["sequences"] or [])
+        for row in (result.data or [])
+    }
 
 
 def _resolve_message(message_data: dict) -> dict:
@@ -108,6 +111,14 @@ def main():
     registered_ids = load_registered_message_ids()
     registered_sequences = load_registered_sequences()
 
+    # Debug: verificar se Thiago está correto
+    thiago = next((p for p in participants.values() if p["name"] == "Thiago"), None)
+    if thiago:
+        print(f"[DEBUG] Thiago id: {thiago['id']}")
+        print(f"[DEBUG] Sequências do Thiago no banco: {sorted(registered_sequences.get(thiago['id'], set()))}")
+        print(f"[DEBUG] Total participantes carregados: {len(registered_sequences)}")
+    print()
+
     missed = []
 
     for msg in messages:
@@ -150,7 +161,7 @@ def main():
             continue
 
         # Já existe um treino com esse número para esse participante
-        if (participant["id"], sequence_number) in registered_sequences:
+        if sequence_number in registered_sequences.get(participant["id"], set()):
             continue
 
         local_dt = submitted_at.astimezone(BR_TZ)

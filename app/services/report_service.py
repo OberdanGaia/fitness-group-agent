@@ -90,15 +90,9 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         deltas_sorted = sorted(deltas, key=lambda x: x[1], reverse=True)
 
         on_fire = [r["name"] for r, d in deltas_sorted if d >= 2][:5]
-        losing_pace = [
-            r["name"] for r, d in deltas
-            if prev.get(r["name"], 0) >= 30 and d == 0
-        ]
 
         if on_fire:
             pelotoes_text += f"\nPELOTÃO ON FIRE (mais treinos desde o último relatório): {', '.join(on_fire)}\n"
-        if losing_pace:
-            pelotoes_text += f"\nPELOTÃO RECARREGANDO (tinham boa sequência mas não treinaram desde o último relatório): {', '.join(losing_pace)}\n"
 
     milestones = _detect_new_milestones(ranking, last_snapshot)
     milestones_text = ""
@@ -113,12 +107,10 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         f"{milestones_text}\n"
         f"REGRAS (siga à risca):\n"
         f"- Mostre a lista completa com os números EXATOS acima — nunca adicione a palavra 'treinos' após os números\n"
-        f"- A competição é cada pessoa contra ela mesma: o objetivo é bater os próprios 200, não superar os outros\n"
-        f"- NÃO crie senso de disputa entre participantes\n"
         f"- Se houver 'PELOTÃO ON FIRE' acima, crie uma seção animada celebrando quem mais treinou no período\n"
-        f"- Se houver 'PELOTÃO RECARREGANDO' acima, mencione com humor leve e carinhoso — uma zoeira gentil, nada pesado\n"
-        f"- NÃO mencione nem insinue nada sobre quem está há muito tempo sem treinar além do que está listado nos pelotões\n"
         f"- Se houver conquistas listadas acima, inclua seção '🏅 Conquistas' no final\n"
+        f"- NÃO adicione frases de lembrete sobre jornada individual, comparação ou motivação genérica\n"
+        f"- Foque no ranking e nas conquistas — sem seções extras além dessas\n"
         f"- Tom descontraído, engraçado e motivador — humor sutil e carinhoso\n"
         f"- Máximo 35 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"

@@ -25,6 +25,7 @@ body = {
         "events": [
             "MESSAGES_UPSERT",
             "MESSAGES_DELETE",
+            "MESSAGES_UPDATE",
         ],
     }
 }

@@ -23,6 +23,10 @@ async def evolution_webhook(request: Request):
         _handle_message_delete(payload)
         return {"status": "ok"}
 
+    if event == "messages.update":
+        await _handle_message_update(payload)
+        return {"status": "ok"}
+
     if event != "messages.upsert":
         return {"status": "ignored"}
 
@@ -46,6 +50,46 @@ async def evolution_webhook(request: Request):
         logger.exception("Unhandled error processing webhook")
 
     return {"status": "ok"}
+
+
+async def _handle_message_update(payload: dict) -> None:
+    data = payload.get("data", {})
+    updates = data if isinstance(data, list) else [data]
+
+    for item in updates:
+        key = item.get("key", {})
+        remote_jid = key.get("remoteJid", "")
+
+        if remote_jid != settings.group_jid:
+            continue
+        if key.get("fromMe", False):
+            continue
+
+        # Extract the edited message content
+        update = item.get("update", {})
+        message = update.get("message") or {}
+
+        # Edited messages are wrapped inside editedMessage
+        edited = message.get("editedMessage", {}).get("message") or message
+
+        if not edited:
+            continue
+
+        # Reconstruct payload in the same format as messages.upsert
+        reconstructed = {
+            "event": "messages.upsert",
+            "data": {
+                "key": key,
+                "message": edited,
+                "messageTimestamp": item.get("messageTimestamp", 0),
+            },
+        }
+
+        logger.info("Processing edited message: id=%s", key.get("id"))
+        try:
+            await handle_incoming_message(reconstructed, remote_jid=remote_jid)
+        except Exception:
+            logger.exception("Error processing edited message: id=%s", key.get("id"))
 
 
 def _handle_message_delete(payload: dict) -> None:

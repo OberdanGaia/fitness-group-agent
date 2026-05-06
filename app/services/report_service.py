@@ -30,20 +30,28 @@ def _get_ranking() -> list[dict]:
     participants = participants_result.data or []
 
     counts_result = supabase.rpc("get_workout_counts").execute()
-    counts: dict[str, int] = {
-        row["participant_id"]: row["count"]
-        for row in (counts_result.data or [])
-    }
+    counts: dict[str, int] = {}
+    last_seqs: dict[str, int] = {}
+    for row in (counts_result.data or []):
+        pid = row["participant_id"]
+        counts[pid] = row["count"]
+        if row.get("last_seq") is not None:
+            last_seqs[pid] = row["last_seq"]
 
     ranking = []
     for p in participants:
         joined = date.fromisoformat(p["joined_at"])
         goal = _calculate_goal(joined, p.get("medical_leave_days", 0))
+        pid = p["id"]
+        count = counts.get(pid, 0)
+        last_seq = last_seqs.get(pid)
+        needs_check = last_seq is not None and count != last_seq
         ranking.append({
             "name": p["name"],
             "phone": p["phone"],
-            "count": counts.get(p["id"], 0),
+            "count": count,
             "goal": goal,
+            "needs_check": needs_check,
         })
 
     ranking.sort(key=lambda x: x["count"], reverse=True)
@@ -71,7 +79,8 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     ranking_lines = []
     for i, r in enumerate(ranking):
         pct = round(r["count"] / r["goal"] * 100) if r["goal"] else 0
-        ranking_lines.append(f"{i + 1}. {r['name']}: {r['count']}/{r['goal']} ({pct}%)")
+        flag = " (! Validar contagem)" if r.get("needs_check") else ""
+        ranking_lines.append(f"{i + 1}. {r['name']}{flag}: {r['count']}/{r['goal']} ({pct}%)")
     ranking_text = "\n".join(ranking_lines)
 
     pelotoes_text = ""

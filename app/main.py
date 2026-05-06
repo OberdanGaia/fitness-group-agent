@@ -7,6 +7,7 @@ from app.api.webhooks import router as webhook_router
 from app.core import constants
 from app.db.repositories import participant_repo
 from app import scheduler
+from app.services import recovery_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     _load_admin_phones()
     scheduler.start()
     logger.info("Fitness bot started. Admins loaded: %s", constants.ADMIN_PHONES)
+    await recovery_service.recover_missed_messages()
     yield
     scheduler.stop()
 

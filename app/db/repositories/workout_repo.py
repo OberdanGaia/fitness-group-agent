@@ -47,6 +47,18 @@ def get_by_participant_and_date(participant_id: str, workout_date: date) -> list
     return result.data or []
 
 
+def soft_delete_by_message_id(message_id: str) -> bool:
+    supabase = get_supabase()
+    result = (
+        supabase.table("workouts")
+        .update({"deleted_at": datetime.utcnow().isoformat(), "is_valid": False})
+        .or_(f"photo_message_id.eq.{message_id},text_message_id.eq.{message_id}")
+        .is_("deleted_at", "null")
+        .execute()
+    )
+    return bool(result.data)
+
+
 def count_valid_by_participant(participant_id: str) -> int:
     result = (
         get_supabase()

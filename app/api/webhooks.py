@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 
 from app.core.config import settings
 from app.handlers.workout_handler import handle_incoming_message
+from app.db.repositories import workout_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -16,8 +17,13 @@ async def evolution_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Invalid secret")
 
     payload = await request.json()
+    event = payload.get("event")
 
-    if payload.get("event") != "messages.upsert":
+    if event == "messages.delete":
+        _handle_message_delete(payload)
+        return {"status": "ok"}
+
+    if event != "messages.upsert":
         return {"status": "ignored"}
 
     data = payload.get("data", {})
@@ -40,3 +46,19 @@ async def evolution_webhook(request: Request):
         logger.exception("Unhandled error processing webhook")
 
     return {"status": "ok"}
+
+
+def _handle_message_delete(payload: dict) -> None:
+    # Evolution API sends either a single key or a list of keys
+    data = payload.get("data", {})
+    keys = data if isinstance(data, list) else [data]
+
+    for item in keys:
+        message_id = (item.get("key") or item).get("id")
+        if not message_id:
+            continue
+        deleted = workout_repo.soft_delete_by_message_id(message_id)
+        if deleted:
+            logger.info("Workout soft-deleted due to message deletion: message_id=%s", message_id)
+        else:
+            logger.debug("Message deleted but no workout found: message_id=%s", message_id)

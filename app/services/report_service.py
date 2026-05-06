@@ -114,6 +114,7 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         f"- Tom descontraído, engraçado e motivador — humor sutil e carinhoso\n"
         f"- Máximo 35 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"
+        f"- Se mencionar o prêmio ou motivação final, é um churrasco — nunca mencione pizza ou outro alimento\n"
         f"- Escreva em português brasileiro informal\n"
         f"- Termine com uma frase motivacional curta e engraçada\n\n"
         f"Gere o relatório agora:"

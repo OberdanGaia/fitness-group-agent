@@ -113,8 +113,9 @@ def _save_workout(
     photo_url: str | None,
 ) -> None:
     from app.core.config import settings
+    import pytz
     shift = message_parser.get_shift(submitted_at, settings.timezone)
-    workout_date = submitted_at.astimezone().date()
+    workout_date = submitted_at.astimezone(pytz.timezone(settings.timezone)).date()
 
     try:
         workout_repo.insert(

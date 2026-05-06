@@ -70,3 +70,11 @@ def count_valid_by_participant(participant_id: str) -> int:
         .execute()
     )
     return result.count or 0
+
+
+def get_count_and_max_seq(participant_id: str) -> tuple[int, int]:
+    result = get_supabase().rpc("get_workout_counts").execute()
+    for row in (result.data or []):
+        if row["participant_id"] == participant_id:
+            return row["count"], row.get("last_seq") or 0
+    return 0, 0

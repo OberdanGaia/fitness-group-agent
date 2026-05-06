@@ -112,12 +112,7 @@ def main():
     registered_sequences = load_registered_sequences()
 
     # Debug: verificar se Thiago está correto
-    thiago = next((p for p in participants.values() if p["name"] == "Thiago"), None)
-    if thiago:
-        print(f"[DEBUG] Thiago id: {thiago['id']}")
-        print(f"[DEBUG] Sequências do Thiago no banco: {sorted(registered_sequences.get(thiago['id'], set()))}")
-        print(f"[DEBUG] Total participantes carregados: {len(registered_sequences)}")
-    print()
+
 
     missed = []
 

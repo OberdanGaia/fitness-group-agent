@@ -61,6 +61,12 @@ def load_registered_message_ids() -> set:
     return ids
 
 
+def load_registered_sequences() -> set:
+    """Retorna conjunto de (participant_id, sequence_number) já no banco."""
+    result = get_supabase().table("workouts").select("participant_id,sequence_number").eq("is_valid", True).is_("deleted_at", "null").execute()
+    return {(row["participant_id"], row["sequence_number"]) for row in (result.data or [])}
+
+
 def _resolve_message(message_data: dict) -> dict:
     """Retorna o conteúdo real da mensagem, desembrulhando edições se necessário."""
     edited = message_data.get("editedMessage", {}).get("message")
@@ -100,6 +106,7 @@ def main():
     cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
     participants = load_participants()
     registered_ids = load_registered_message_ids()
+    registered_sequences = load_registered_sequences()
 
     missed = []
 
@@ -140,6 +147,10 @@ def main():
 
         # Só considera mensagens com foto + número (treino completo)
         if not has_photo or sequence_number is None:
+            continue
+
+        # Já existe um treino com esse número para esse participante
+        if (participant["id"], sequence_number) in registered_sequences:
             continue
 
         local_dt = submitted_at.astimezone(BR_TZ)

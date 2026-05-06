@@ -50,17 +50,17 @@ async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None
 
     if is_photo and sequence_number is not None:
         # Best case: photo with caption containing N/200
-        count_before = workout_repo.count_valid_by_participant(participant["id"])
+        _, max_seq_before = workout_repo.get_count_and_max_seq(participant["id"])
         photo_url = await _store_photo(message_data, participant["phone"], message_id, submitted_at)
         _save_workout(participant, message_id, message_id, submitted_at, sequence_number, photo_url)
-        _check_sequence_mismatch(participant, sequence_number, count_before)
+        _check_sequence_mismatch(participant, sequence_number, max_seq_before)
 
     elif is_photo:
         # Photo only — wait for the text
         photo_url = await _store_photo(message_data, participant["phone"], message_id, submitted_at)
         pending = pending_message_repo.get_pending_counterpart(participant["id"], "text")
         if pending:
-            count_before = workout_repo.count_valid_by_participant(participant["id"])
+            _, max_seq_before = workout_repo.get_count_and_max_seq(participant["id"])
             _save_workout(
                 participant,
                 message_id,
@@ -70,7 +70,7 @@ async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None
                 photo_url,
             )
             pending_message_repo.delete(pending["id"])
-            _check_sequence_mismatch(participant, pending["sequence_number"], count_before)
+            _check_sequence_mismatch(participant, pending["sequence_number"], max_seq_before)
         else:
             pending_message_repo.insert_photo(participant["id"], message_id, payload, photo_url)
 
@@ -78,7 +78,7 @@ async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None
         # Text with N/200 — look for a pending photo
         pending = pending_message_repo.get_pending_counterpart(participant["id"], "photo")
         if pending:
-            count_before = workout_repo.count_valid_by_participant(participant["id"])
+            _, max_seq_before = workout_repo.get_count_and_max_seq(participant["id"])
             _save_workout(
                 participant,
                 pending["message_id"],
@@ -88,7 +88,7 @@ async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None
                 pending["photo_url"],
             )
             pending_message_repo.delete(pending["id"])
-            _check_sequence_mismatch(participant, sequence_number, count_before)
+            _check_sequence_mismatch(participant, sequence_number, max_seq_before)
         else:
             pending_message_repo.insert_text(
                 participant["id"], message_id, payload, sequence_number, raw_text
@@ -113,14 +113,14 @@ async def _store_photo(
         return None
 
 
-def _check_sequence_mismatch(participant: dict, sequence_number: int, count_before: int) -> None:
-    if sequence_number != count_before + 1:
-        task = asyncio.create_task(_alert_mismatch_later(participant, sequence_number, count_before + 1))
+def _check_sequence_mismatch(participant: dict, sequence_number: int, max_seq_before: int) -> None:
+    if sequence_number != max_seq_before + 1:
+        task = asyncio.create_task(_alert_mismatch_later(participant, sequence_number, max_seq_before))
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
 
 
-async def _alert_mismatch_later(participant: dict, sent_seq: int, expected_seq: int) -> None:
+async def _alert_mismatch_later(participant: dict, sent_seq: int, max_seq_at_send: int) -> None:
     from app.core.config import settings
     from app.services import whatsapp_service
 
@@ -130,11 +130,18 @@ async def _alert_mismatch_later(participant: dict, sent_seq: int, expected_seq: 
     if count == max_seq:
         return
 
+    missing = list(range(max_seq_at_send + 1, sent_seq))
+    if len(missing) == 1:
+        missing_str = f"o treino {missing[0]}/200"
+    else:
+        missing_str = f"os treinos {', '.join(str(m) for m in missing)}/200"
+
+    last_ref = f"o último registrado era {max_seq_at_send}/200" if max_seq_at_send > 0 else "nenhum treino registrado antes"
     msg = (
-        f"⚠️ {participant['name']} mandou {sent_seq}/200 mas tem {count} treino(s) registrado(s) "
-        f"(esperado: {expected_seq}/200). Pode ser erro de contagem."
+        f"⚠️ {participant['name']} mandou {sent_seq}/200 mas {last_ref}. "
+        f"Parece que perdemos {missing_str}."
     )
-    logger.info("Sequence mismatch alert: %s sent=%d expected=%d", participant["name"], sent_seq, expected_seq)
+    logger.info("Sequence mismatch alert: %s sent=%d last_registered=%d", participant["name"], sent_seq, max_seq_at_send)
     await whatsapp_service.send_private_message(settings.oberdan_phone, msg)
 
 

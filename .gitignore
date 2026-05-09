@@ -10,6 +10,7 @@ venv/
 dist/
 build/
 .DS_Store
+reports/*.html
 .claude/
 !.claude/skills/
 !.claude/skills/**

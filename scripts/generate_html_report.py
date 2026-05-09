@@ -277,6 +277,7 @@ def generate_html(data: dict) -> str:
   .kpi .kpi-lbl{{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;font-weight:600}}
   .kpi .kpi-val{{font-size:28px;font-weight:800;color:#1e293b;line-height:1.1}}
   .kpi .kpi-sub{{font-size:12px;color:#94a3b8}}
+  .kpi .kpi-desc{{font-size:10px;color:#cbd5e1;font-style:italic;line-height:1.4;margin-top:2px}}
 
   /* Sections */
   section{{background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:22px}}
@@ -345,12 +346,14 @@ def generate_html(data: dict) -> str:
       <span class="kpi-lbl">Maior streak histórico</span>
       <span class="kpi-val">{data['best_streak_days']} dias</span>
       <span class="kpi-sub">{data['best_streak_name']}</span>
+      <span class="kpi-desc">Maior sequência de dias consecutivos treinados</span>
     </div>
     <div class="kpi pink">
       <span class="kpi-icon">🏆</span>
       <span class="kpi-lbl">Atleta de {data['athlete_month']}</span>
       <span class="kpi-val">{data['athlete_count']} treinos</span>
       <span class="kpi-sub">{data['athlete_name']}</span>
+      <span class="kpi-desc">Quem mais treinou no mês anterior</span>
     </div>
   </div>
 

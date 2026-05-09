@@ -24,6 +24,8 @@ def insert(
         "text_message_id": text_message_id,
         "photo_url": photo_url,
         "modality": modality,
+        "is_valid": True,
+        "deleted_at": None,
     }
     result = (
         get_supabase()

@@ -374,7 +374,33 @@ def generate_html(data: dict) -> str:
   footer{{text-align:center;font-size:12px;color:#94a3b8;padding:20px}}
 
   @media(max-width:1024px){{.kpis{{grid-template-columns:repeat(3,1fr)}}}}
-  @media(max-width:768px){{.kpis{{grid-template-columns:repeat(2,1fr)}}.charts{{grid-template-columns:1fr}}th,td{{padding:7px 8px}}}}
+  @media(max-width:768px){{
+    header{{padding:18px 16px}}
+    header h1{{font-size:18px}}
+    .view-toggle{{display:none}}
+    .container{{padding:14px 10px}}
+    .kpis{{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}}
+    .kpi{{padding:12px 10px;gap:3px}}
+    .kpi .kpi-icon{{font-size:16px}}
+    .kpi .kpi-lbl{{font-size:9px;letter-spacing:.3px}}
+    .kpi .kpi-val{{font-size:20px}}
+    .kpi .kpi-sub{{font-size:10px}}
+    .kpi .kpi-desc{{font-size:9px}}
+    section{{padding:14px 10px;margin-bottom:12px}}
+    section h2{{font-size:11px;margin-bottom:12px}}
+    .charts{{grid-template-columns:1fr;gap:12px;margin-bottom:12px}}
+    .chart-box{{padding:14px 10px}}
+    .chart-box h2{{font-size:11px;margin-bottom:10px}}
+    .table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -10px;padding:0 10px}}
+    table{{font-size:12px;min-width:640px}}
+    th{{padding:8px 10px;font-size:10px}}
+    td{{padding:9px 10px;white-space:nowrap}}
+    td.name{{position:sticky;left:0;background:#fff;z-index:1;box-shadow:2px 0 6px rgba(0,0,0,.08)}}
+    tr:hover td.name{{background:#f8fafc}}
+    .bar-wrap{{min-width:70px}}
+    .badge{{padding:2px 7px;font-size:10px}}
+    footer{{font-size:11px;padding:14px}}
+  }}
 </style>
 </head>
 <body>

@@ -38,6 +38,12 @@ def _get_ranking() -> list[dict]:
         if row.get("last_seq") is not None:
             last_seqs[pid] = row["last_seq"]
 
+    consec_result = supabase.rpc("get_consecutive_days").execute()
+    consecutive: dict[str, int] = {
+        row["participant_id"]: row["consecutive_days"]
+        for row in (consec_result.data or [])
+    }
+
     ranking = []
     for p in participants:
         joined = date.fromisoformat(p["joined_at"])
@@ -52,24 +58,24 @@ def _get_ranking() -> list[dict]:
             "count": count,
             "goal": goal,
             "needs_check": needs_check,
+            "consecutive_days": consecutive.get(pid, 0),
         })
 
     ranking.sort(key=lambda x: x["count"], reverse=True)
     return ranking
 
 
-MILESTONES = {25: "25% da meta", 50: "metade da meta!", 75: "75% da meta", 100: "meta batida! 🏆"}
+MILESTONES = {50: "50 treinos", 100: "100 treinos", 150: "150 treinos", 200: "200 treinos"}
 
 
-def _detect_new_milestones(ranking: list[dict], last_snapshot: Optional[list]) -> list[str]:
+def _detect_new_milestones(ranking: list[dict], last_snapshot: Optional[list]) -> list[tuple]:
     prev = {r["name"]: r["count"] for r in last_snapshot} if last_snapshot else {}
     achievements = []
     for r in ranking:
         prev_count = prev.get(r["name"], 0)
-        for pct, label in MILESTONES.items():
-            threshold = max(round(r["goal"] * pct / 100), 1)
+        for threshold, label in MILESTONES.items():
             if r["count"] >= threshold and prev_count < threshold:
-                achievements.append(f"- {r['name']} chegou aos {label} ({r['count']}/{r['goal']})")
+                achievements.append((threshold, r["name"], r["count"], r["goal"]))
     return achievements
 
 
@@ -83,38 +89,51 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
         ranking_lines.append(f"{i + 1}. {r['name']}{flag}: {r['count']}/{r['goal']} ({pct}%)")
     ranking_text = "\n".join(ranking_lines)
 
-    pelotoes_text = ""
-    if last_snapshot:
-        prev = {r["name"]: r["count"] for r in last_snapshot}
-        deltas = [(r, r["count"] - prev.get(r["name"], 0)) for r in ranking]
-        deltas_sorted = sorted(deltas, key=lambda x: x[1], reverse=True)
+    on_fire_entries = sorted(
+        [(r["name"], r["consecutive_days"]) for r in ranking if r.get("consecutive_days", 0) >= 2],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+    on_fire_text = ""
+    if on_fire_entries:
+        lines = "\n".join(f"- {name}: {days} dias seguidos" for name, days in on_fire_entries)
+        on_fire_text = f"ON FIRE da semana 🔥 (streak de dias consecutivos):\n{lines}\n"
 
-        on_fire = [r["name"] for r, d in deltas_sorted if d >= 2][:5]
-
-        if on_fire:
-            pelotoes_text += f"\nPELOTÃO ON FIRE (mais treinos desde o último relatório): {', '.join(on_fire)}\n"
-
-    milestones = _detect_new_milestones(ranking, last_snapshot)
-    milestones_text = ""
-    if milestones:
-        milestones_text = "\nConquistas desde o último relatório:\n" + "\n".join(milestones) + "\n"
+    achievements = _detect_new_milestones(ranking, last_snapshot)
+    vale_text = ""
+    if achievements:
+        lines = []
+        for threshold, name, count, goal in achievements:
+            if threshold == 200:
+                lines.append(f"- {name}: BATEU A META! 200/200 treinos!")
+            else:
+                lines.append(f"- {name}: chegou aos {threshold} treinos ({count}/{goal})")
+        vale_text = "Vale ser falado:\n" + "\n".join(lines) + "\n"
 
     return (
         f"Você é o agente do Fitness 2026, um grupo de amigos numa aposta fitness no WhatsApp. "
         f"Gere o relatório do grupo. Hoje é {today.strftime('%d/%m/%Y')}.\n\n"
-        f"PROGRESSO ATUAL (use EXATAMENTE esses números, sem alterar nenhum valor):\n{ranking_text}\n"
-        f"{pelotoes_text}"
-        f"{milestones_text}\n"
-        f"REGRAS (siga à risca):\n"
-        f"- Mostre a lista completa com os números EXATOS acima — nunca adicione a palavra 'treinos' após os números\n"
-        f"- Se houver 'PELOTÃO ON FIRE' acima, crie uma seção animada celebrando quem mais treinou no período\n"
-        f"- Se houver conquistas listadas acima, inclua seção '🏅 Conquistas' no final\n"
+        f"ESTRUTURA OBRIGATÓRIA (siga essa ordem exata):\n"
+        f"1. Saudação inicial informal e descontraída — varie sempre (ex: 'Fala galera!', 'E aí, grupo!', 'Oi pessoal!')\n"
+        f"2. Seção 'Vale ser falado:' — inclua SOMENTE se houver dados abaixo\n"
+        f"3. Seção 'ON FIRE da semana 🔥' — inclua SOMENTE se houver dados abaixo\n"
+        f"4. Seção 'Como evoluímos essa semana' com o ranking completo\n\n"
+        f"DADOS (use EXATAMENTE esses valores, sem alterar nenhum número):\n\n"
+        f"{vale_text}"
+        f"{on_fire_text}\n"
+        f"RANKING COMPLETO:\n{ranking_text}\n\n"
+        f"REGRAS OBRIGATÓRIAS:\n"
+        f"- NUNCA use asteriscos (**) para negrito — texto puro apenas\n"
+        f"- Na seção 'Vale ser falado:': parabenize cada conquista com entusiasmo\n"
+        f"- Se alguém bateu 200 treinos, comemore exageradamente — use variações de 'PARABÉEEEEEENS' e frases como 'EU SABIA QUE VOCÊ IA CONSEGUIR!'\n"
+        f"- Na seção 'ON FIRE da semana 🔥': para cada pessoa, mencione quantos dias seguidos ela está treinando. Ex: 'Parabéns Fulana, você está treinando há X dias seguidos, continue assim!' ou 'Muuuito bom Fulano, X dias na sequência!'\n"
+        f"- Mostre o ranking completo com os números EXATOS — nunca adicione a palavra 'treinos' após os números\n"
+        f"- NÃO use palavras agressivas como 'sem choradeira', 'parem de reclamar', 'chorem'\n"
         f"- NÃO adicione frases de lembrete sobre jornada individual, comparação ou motivação genérica\n"
-        f"- Foque no ranking e nas conquistas — sem seções extras além dessas\n"
         f"- Tom descontraído, engraçado e motivador — humor sutil e carinhoso\n"
-        f"- Máximo 35 linhas, use emojis com moderação\n"
+        f"- Máximo 40 linhas, use emojis com moderação\n"
         f"- Não mencione valores em dinheiro\n"
-        f"- Se mencionar o prêmio ou motivação final, é um churrasco — nunca mencione pizza ou outro alimento\n"
+        f"- Se mencionar o prêmio, é um churrasco — nunca mencione pizza\n"
         f"- Escreva em português brasileiro informal\n"
         f"- Termine com uma frase motivacional curta e engraçada\n\n"
         f"Gere o relatório agora:"

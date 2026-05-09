@@ -13,8 +13,8 @@ import httpx
 from app.core.config import settings
 from app.db.client import get_supabase
 
-NAME = "Jheni"
-NEW_PHONE = "5519994448054"
+NAME = ""
+NEW_PHONE = ""
 
 
 def fetch_group_participants() -> list[dict]:

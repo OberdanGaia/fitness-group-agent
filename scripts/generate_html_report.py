@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
+from calendar import monthrange
 from datetime import date, timedelta
 from collections import defaultdict
 
@@ -18,6 +19,12 @@ from app.core.constants import CHALLENGE_START, CHALLENGE_END, CHALLENGE_DAYS, G
 from app.db.client import get_supabase
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports", "relatorio_fitness2026.html")
+
+MONTHS_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+}
 
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
@@ -52,6 +59,7 @@ def fetch_data():
         if len(batch) < 1000:
             break
         offset += 1000
+
     return participants, counts, consecutive, workouts
 
 
@@ -77,17 +85,35 @@ def calculate_max_streak(dates: list) -> int:
     return max_streak
 
 
+def get_prev_month_range(today: date) -> tuple[date, date, str]:
+    prev_month = today.month - 1 if today.month > 1 else 12
+    prev_year = today.year if today.month > 1 else today.year - 1
+    last_day = monthrange(prev_year, prev_month)[1]
+    return date(prev_year, prev_month, 1), date(prev_year, prev_month, last_day), MONTHS_PT[prev_month]
+
+
 def process_data(participants, counts, consecutive, workouts):
     today = date.today()
     days_elapsed = (today - CHALLENGE_START).days + 1
     days_remaining = (CHALLENGE_END - today).days
-
-    workouts_by_pid = defaultdict(list)
-    for w in workouts:
-        workouts_by_pid[w["participant_id"]].append((date.fromisoformat(w["workout_date"]), w["shift"]))
-
     eight_weeks_ago = today - timedelta(weeks=8)
     total_recent_weeks = {(today - timedelta(weeks=i)).isocalendar()[:2] for i in range(8)}
+
+    prev_month_start, prev_month_end, prev_month_name = get_prev_month_range(today)
+
+    workouts_by_pid = defaultdict(list)
+    monthly_counts_by_pid = defaultdict(int)
+    for w in workouts:
+        wd = date.fromisoformat(w["workout_date"])
+        workouts_by_pid[w["participant_id"]].append((wd, w["shift"]))
+        if prev_month_start <= wd <= prev_month_end:
+            monthly_counts_by_pid[w["participant_id"]] += 1
+
+    # Atleta do mês
+    pid_lookup = {p["id"]: p["name"] for p in participants}
+    athlete_pid = max(monthly_counts_by_pid, key=monthly_counts_by_pid.get) if monthly_counts_by_pid else None
+    athlete_name = pid_lookup.get(athlete_pid, "—") if athlete_pid else "—"
+    athlete_count = monthly_counts_by_pid.get(athlete_pid, 0) if athlete_pid else 0
 
     ranking = []
     for p in participants:
@@ -102,11 +128,11 @@ def process_data(participants, counts, consecutive, workouts):
         dates_list = []
         recent_weeks = set()
 
-        for workout_date, shift in workouts_by_pid.get(pid, []):
+        for wd, shift in workouts_by_pid.get(pid, []):
             shift_counts[shift] += 1
-            dates_list.append(workout_date)
-            if workout_date >= eight_weeks_ago:
-                recent_weeks.add(workout_date.isocalendar()[:2])
+            dates_list.append(wd)
+            if wd >= eight_weeks_ago:
+                recent_weeks.add(wd.isocalendar()[:2])
 
         preferred_shift = max(shift_counts, key=shift_counts.get) if shift_counts else "-"
         max_streak = calculate_max_streak(dates_list)
@@ -129,28 +155,29 @@ def process_data(participants, counts, consecutive, workouts):
     total_workouts = sum(r["count"] for r in ranking)
     total_goal = sum(r["goal"] for r in ranking)
     group_pct = round(total_workouts / total_goal * 100) if total_goal else 0
+    best_streak = max(ranking, key=lambda x: x["max_streak"])
     on_pace_count = sum(1 for r in ranking if r["on_pace"])
 
     # Weekly trend — last 8 weeks
     weekly_counts = defaultdict(int)
     for w in workouts:
-        d = date.fromisoformat(w["workout_date"])
-        if d >= eight_weeks_ago:
-            week_start = d - timedelta(days=d.weekday())
+        wd = date.fromisoformat(w["workout_date"])
+        if wd >= eight_weeks_ago:
+            week_start = wd - timedelta(days=wd.weekday())
             weekly_counts[week_start] += 1
     weeks_sorted = sorted(weekly_counts)
-    weekly_labels = [f"{w.strftime('%d/%m')}" for w in weeks_sorted]
+    weekly_labels = [w.strftime("%d/%m") for w in weeks_sorted]
     weekly_values = [weekly_counts[w] for w in weeks_sorted]
 
-    # Shift distribution (group)
+    # Shift distribution
     shift_total = defaultdict(int)
     for w in workouts:
         shift_total[w["shift"]] += 1
-    shift_map = {"manha": "Manhã", "tarde": "Tarde", "noite": "Noite"}
+    shift_map = {"manha": "Manhã", "tarde": "Tarde", "noite": "Noite", "madrugada": "Madrugada"}
     shift_labels = [shift_map.get(s, s) for s in shift_total]
     shift_values = list(shift_total.values())
 
-    # Day of week distribution
+    # Day of week
     dow_counts = defaultdict(int)
     for w in workouts:
         dow_counts[date.fromisoformat(w["workout_date"]).weekday()] += 1
@@ -165,6 +192,11 @@ def process_data(participants, counts, consecutive, workouts):
         "group_pct": group_pct,
         "on_pace_count": on_pace_count,
         "behind_count": len(ranking) - on_pace_count,
+        "best_streak_name": best_streak["name"],
+        "best_streak_days": best_streak["max_streak"],
+        "athlete_name": athlete_name,
+        "athlete_count": athlete_count,
+        "athlete_month": prev_month_name,
         "ranking": ranking,
         "weekly_labels": weekly_labels,
         "weekly_values": weekly_values,
@@ -177,7 +209,7 @@ def process_data(participants, counts, consecutive, workouts):
 
 # ── HTML generation ───────────────────────────────────────────────────────────
 
-SHIFT_ICON = {"manha": "🌅 Manhã", "tarde": "☀️ Tarde", "noite": "🌙 Noite"}
+SHIFT_ICON = {"manha": "🌅 Manhã", "tarde": "☀️ Tarde", "noite": "🌙 Noite", "madrugada": "🌑 Madrugada"}
 
 
 def build_ranking_rows(ranking: list) -> str:
@@ -210,97 +242,119 @@ def build_ranking_rows(ranking: list) -> str:
 
 
 def generate_html(data: dict) -> str:
-    ranking = data["ranking"]
-    best_streak = max(ranking, key=lambda x: x["max_streak"])
-    most_consistent = max(ranking, key=lambda x: x["consistency"])
-    rows = build_ranking_rows(ranking)
+    rows = build_ranking_rows(data["ranking"])
 
-    weekly_json = json.dumps(data["weekly_labels"])
-    weekly_val_json = json.dumps(data["weekly_values"])
-    shift_json = json.dumps(data["shift_labels"])
-    shift_val_json = json.dumps(data["shift_values"])
-    dow_json = json.dumps(data["dow_labels"])
-    dow_val_json = json.dumps(data["dow_values"])
+    weekly_json    = json.dumps(data["weekly_labels"])
+    weekly_val     = json.dumps(data["weekly_values"])
+    shift_json     = json.dumps(data["shift_labels"])
+    shift_val      = json.dumps(data["shift_values"])
+    dow_json       = json.dumps(data["dow_labels"])
+    dow_val        = json.dumps(data["dow_values"])
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fitness 2026 — Relatório</title>
+<title>Fitness 2026 — Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}}
-  header{{background:linear-gradient(135deg,#1e3a5f,#0ea5e9);color:#fff;padding:32px 40px}}
-  header h1{{font-size:26px;font-weight:700}}
-  header p{{opacity:.85;margin-top:6px;font-size:13px}}
-  .container{{max-width:1200px;margin:0 auto;padding:28px 20px}}
-  .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}}
-  .card{{background:#fff;border-radius:12px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.07)}}
-  .card .lbl{{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:8px}}
-  .card .val{{font-size:30px;font-weight:700;color:#0ea5e9}}
-  .card .sub{{font-size:12px;color:#94a3b8;margin-top:4px}}
-  section{{background:#fff;border-radius:12px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:22px}}
-  section h2{{font-size:14px;font-weight:600;color:#334155;margin-bottom:18px;border-left:3px solid #0ea5e9;padding-left:10px;text-transform:uppercase;letter-spacing:.4px}}
+
+  header{{background:linear-gradient(135deg,#1e3a5f,#0ea5e9);color:#fff;padding:28px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}}
+  header h1{{font-size:24px;font-weight:700}}
+  header p{{opacity:.85;font-size:13px;margin-top:4px}}
+  header .date-badge{{background:rgba(255,255,255,.15);border-radius:99px;padding:6px 16px;font-size:13px;white-space:nowrap}}
+
+  .container{{max-width:1300px;margin:0 auto;padding:28px 20px}}
+
+  /* KPIs */
+  .kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px}}
+  .kpi{{background:#fff;border-radius:14px;padding:22px 18px;box-shadow:0 1px 4px rgba(0,0,0,.07);display:flex;flex-direction:column;gap:6px;border-top:4px solid transparent}}
+  .kpi.blue{{border-color:#0ea5e9}}.kpi.green{{border-color:#22c55e}}.kpi.purple{{border-color:#8b5cf6}}.kpi.orange{{border-color:#f59e0b}}.kpi.pink{{border-color:#ec4899}}
+  .kpi .kpi-icon{{font-size:22px;line-height:1}}
+  .kpi .kpi-lbl{{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;font-weight:600}}
+  .kpi .kpi-val{{font-size:28px;font-weight:800;color:#1e293b;line-height:1.1}}
+  .kpi .kpi-sub{{font-size:12px;color:#94a3b8}}
+
+  /* Sections */
+  section{{background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:22px}}
+  section h2{{font-size:13px;font-weight:700;color:#334155;margin-bottom:20px;text-transform:uppercase;letter-spacing:.5px;border-left:3px solid #0ea5e9;padding-left:10px}}
+
+  /* Table */
   table{{width:100%;border-collapse:collapse;font-size:13px}}
-  th{{padding:9px 11px;background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e2e8f0;text-align:left}}
-  td{{padding:11px;border-bottom:1px solid #f1f5f9;vertical-align:middle}}
+  th{{padding:9px 12px;background:#f8fafc;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap}}
+  td{{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}}
   tr:last-child td{{border-bottom:none}}
   tr:hover td{{background:#f8fafc}}
   td.center{{text-align:center}}
   td.name{{font-weight:600}}
-  .bar-wrap{{position:relative;background:#f1f5f9;border-radius:99px;height:18px;min-width:90px;overflow:hidden}}
+  .bar-wrap{{position:relative;background:#f1f5f9;border-radius:99px;height:18px;min-width:100px;overflow:hidden}}
   .bar{{height:100%;border-radius:99px}}
   .bar-label{{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:#334155}}
   .badge{{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:500}}
   .badge.on-pace{{background:#dcfce7;color:#166534}}
   .badge.behind{{background:#fef9c3;color:#854d0e}}
+
+  /* Charts */
   .charts{{display:grid;grid-template-columns:2fr 1fr;gap:22px;margin-bottom:22px}}
-  .chart-box{{background:#fff;border-radius:12px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.07)}}
-  .chart-box h2{{font-size:14px;font-weight:600;color:#334155;margin-bottom:18px;border-left:3px solid #0ea5e9;padding-left:10px;text-transform:uppercase;letter-spacing:.4px}}
-  .highlights{{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px}}
-  .hl{{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.07);text-align:center}}
-  .hl .icon{{font-size:28px;margin-bottom:8px}}
-  .hl .hl-lbl{{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.4px}}
-  .hl .hl-val{{font-size:22px;font-weight:700;color:#1e293b;margin-top:4px}}
-  .hl .hl-sub{{font-size:12px;color:#94a3b8;margin-top:2px}}
+  .chart-box{{background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07)}}
+  .chart-box h2{{font-size:13px;font-weight:700;color:#334155;margin-bottom:18px;text-transform:uppercase;letter-spacing:.5px;border-left:3px solid #0ea5e9;padding-left:10px}}
+
   footer{{text-align:center;font-size:12px;color:#94a3b8;padding:20px}}
-  @media(max-width:768px){{.charts{{grid-template-columns:1fr}}th,td{{padding:7px 6px}}}}
+
+  @media(max-width:1024px){{.kpis{{grid-template-columns:repeat(3,1fr)}}}}
+  @media(max-width:768px){{.kpis{{grid-template-columns:repeat(2,1fr)}}.charts{{grid-template-columns:1fr}}th,td{{padding:7px 8px}}}}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🏋️ Perde treino, perde dinheiro 2026</h1>
-  <p>Relatório gerado em {data['today']} &nbsp;·&nbsp; {data['days_remaining']} dias restantes na aposta</p>
+  <div>
+    <h1>🏋️ Perde treino, perde dinheiro 2026</h1>
+    <p>Dashboard do grupo — atualizado em {data['today']}</p>
+  </div>
+  <div class="date-badge">📅 {data['days_remaining']} dias restantes</div>
 </header>
 
 <div class="container">
 
-  <div class="cards">
-    <div class="card">
-      <div class="lbl">Treinos no grupo</div>
-      <div class="val">{data['total_workouts']}</div>
-      <div class="sub">de {data['total_goal']} no total</div>
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi blue">
+      <span class="kpi-icon">🏋️</span>
+      <span class="kpi-lbl">Treinos do grupo</span>
+      <span class="kpi-val">{data['total_workouts']}</span>
+      <span class="kpi-sub">de {data['total_goal']} no total</span>
     </div>
-    <div class="card">
-      <div class="lbl">Progresso coletivo</div>
-      <div class="val">{data['group_pct']}%</div>
-      <div class="sub">da meta total do grupo</div>
+    <div class="kpi green">
+      <span class="kpi-icon">📈</span>
+      <span class="kpi-lbl">Progresso coletivo</span>
+      <span class="kpi-val">{data['group_pct']}%</span>
+      <span class="kpi-sub">da meta total do grupo</span>
     </div>
-    <div class="card">
-      <div class="lbl">No ritmo</div>
-      <div class="val">{data['on_pace_count']}</div>
-      <div class="sub">{data['behind_count']} atrasados</div>
+    <div class="kpi purple">
+      <span class="kpi-icon">📅</span>
+      <span class="kpi-lbl">Dias restantes</span>
+      <span class="kpi-val">{data['days_remaining']}</span>
+      <span class="kpi-sub">até 20/12/2026</span>
     </div>
-    <div class="card">
-      <div class="lbl">Dias restantes</div>
-      <div class="val">{data['days_remaining']}</div>
-      <div class="sub">até 20/12/2026</div>
+    <div class="kpi orange">
+      <span class="kpi-icon">🔥</span>
+      <span class="kpi-lbl">Maior streak histórico</span>
+      <span class="kpi-val">{data['best_streak_days']} dias</span>
+      <span class="kpi-sub">{data['best_streak_name']}</span>
+    </div>
+    <div class="kpi pink">
+      <span class="kpi-icon">🏆</span>
+      <span class="kpi-lbl">Atleta de {data['athlete_month']}</span>
+      <span class="kpi-val">{data['athlete_count']} treinos</span>
+      <span class="kpi-sub">{data['athlete_name']}</span>
     </div>
   </div>
 
+  <!-- Ranking -->
   <section>
     <h2>Ranking dos participantes</h2>
     <table>
@@ -322,33 +376,7 @@ def generate_html(data: dict) -> str:
     </table>
   </section>
 
-  <div class="highlights">
-    <div class="hl">
-      <div class="icon">🔥</div>
-      <div class="hl-lbl">Maior streak histórico</div>
-      <div class="hl-val">{best_streak['max_streak']} dias</div>
-      <div class="hl-sub">{best_streak['name']}</div>
-    </div>
-    <div class="hl">
-      <div class="icon">🏆</div>
-      <div class="hl-lbl">Mais consistente (8 sem.)</div>
-      <div class="hl-val">{most_consistent['consistency']}%</div>
-      <div class="hl-sub">{most_consistent['name']}</div>
-    </div>
-    <div class="hl">
-      <div class="icon">✅</div>
-      <div class="hl-lbl">No ritmo para a meta</div>
-      <div class="hl-val">{data['on_pace_count']} de {len(ranking)}</div>
-      <div class="hl-sub">participantes</div>
-    </div>
-    <div class="hl">
-      <div class="icon">📅</div>
-      <div class="hl-lbl">Dias restantes</div>
-      <div class="hl-val">{data['days_remaining']}</div>
-      <div class="hl-sub">até 20/12/2026</div>
-    </div>
-  </div>
-
+  <!-- Charts row 1 -->
   <div class="charts">
     <div class="chart-box">
       <h2>Treinos por semana — últimas 8 semanas</h2>
@@ -360,6 +388,7 @@ def generate_html(data: dict) -> str:
     </div>
   </div>
 
+  <!-- Charts row 2 -->
   <section>
     <h2>Treinos por dia da semana</h2>
     <canvas id="dowChart" height="70"></canvas>
@@ -367,15 +396,15 @@ def generate_html(data: dict) -> str:
 
 </div>
 
-<footer>Fitness 2026 · Gerado automaticamente em {data['today']}</footer>
+<footer>Fitness 2026 · Gerado em {data['today']}</footer>
 
 <script>
 const weeklyLabels = {weekly_json};
-const weeklyValues = {weekly_val_json};
+const weeklyValues = {weekly_val};
 const shiftLabels  = {shift_json};
-const shiftValues  = {shift_val_json};
+const shiftValues  = {shift_val};
 const dowLabels    = {dow_json};
-const dowValues    = {dow_val_json};
+const dowValues    = {dow_val};
 
 new Chart(document.getElementById('weeklyChart'), {{
   type: 'bar',
@@ -385,7 +414,7 @@ new Chart(document.getElementById('weeklyChart'), {{
 
 new Chart(document.getElementById('shiftChart'), {{
   type: 'doughnut',
-  data: {{ labels: shiftLabels, datasets: [{{ data: shiftValues, backgroundColor: ['#f59e0b','#0ea5e9','#6366f1'], borderWidth: 0 }}] }},
+  data: {{ labels: shiftLabels, datasets: [{{ data: shiftValues, backgroundColor: ['#f59e0b','#0ea5e9','#6366f1','#94a3b8'], borderWidth: 0 }}] }},
   options: {{ plugins: {{ legend: {{ position: 'bottom' }} }}, cutout: '60%' }}
 }});
 
@@ -402,7 +431,7 @@ new Chart(document.getElementById('dowChart'), {{
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
-    print("\n=== Relatório HTML — Fitness 2026 ===\n")
+    print("\n=== Dashboard HTML — Fitness 2026 ===\n")
     print("Buscando dados do banco...")
     participants, counts, consecutive, workouts = fetch_data()
     print(f"{len(participants)} participantes | {len(workouts)} treinos\n")
@@ -416,7 +445,7 @@ def main():
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(f"\n✅ Relatório gerado: {OUTPUT_PATH}")
+    print(f"\n✅ Dashboard gerado: {OUTPUT_PATH}")
     print("Abra o arquivo no navegador para visualizar.\n")
 
 

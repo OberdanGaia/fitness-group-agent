@@ -37,14 +37,21 @@ def fetch_data():
     consecutive_raw = supabase.rpc("get_consecutive_days").execute().data or []
     consecutive = {r["participant_id"]: r["consecutive_days"] for r in consecutive_raw}
 
-    workouts = (
-        supabase.table("workouts")
-        .select("participant_id,workout_date,shift")
-        .eq("is_valid", True)
-        .is_("deleted_at", "null")
-        .limit(5000)
-        .execute().data or []
-    )
+    workouts = []
+    offset = 0
+    while True:
+        batch = (
+            supabase.table("workouts")
+            .select("participant_id,workout_date,shift")
+            .eq("is_valid", True)
+            .is_("deleted_at", "null")
+            .range(offset, offset + 999)
+            .execute().data or []
+        )
+        workouts.extend(batch)
+        if len(batch) < 1000:
+            break
+        offset += 1000
     return participants, counts, consecutive, workouts
 
 

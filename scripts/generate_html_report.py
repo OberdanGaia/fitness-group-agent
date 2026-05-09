@@ -131,8 +131,9 @@ def process_data(participants, counts, consecutive, workouts):
         for wd, shift in workouts_by_pid.get(pid, []):
             shift_counts[shift] += 1
             dates_list.append(wd)
-            if wd >= eight_weeks_ago:
-                recent_weeks.add(wd.isocalendar()[:2])
+            week = wd.isocalendar()[:2]
+            if week in total_recent_weeks:
+                recent_weeks.add(week)
 
         preferred_shift = max(shift_counts, key=shift_counts.get) if shift_counts else "-"
         max_streak = calculate_max_streak(dates_list)

@@ -20,7 +20,7 @@ from app.db.client import get_supabase
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports", "relatorio_fitness2026.html")
 
-BOT_START_DATE = date(2026, 5, 1)
+BOT_START_DATE = date(2026, 4, 25)
 
 MONTHS_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",

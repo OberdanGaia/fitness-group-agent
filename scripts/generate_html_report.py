@@ -105,7 +105,8 @@ def process_data(participants, counts, consecutive, workouts):
     monthly_counts_by_pid = defaultdict(int)
     for w in workouts:
         wd = date.fromisoformat(w["workout_date"])
-        workouts_by_pid[w["participant_id"]].append((wd, w["shift"]))
+        has_msg_id = bool(w.get("photo_message_id") or w.get("text_message_id"))
+        workouts_by_pid[w["participant_id"]].append((wd, w["shift"], has_msg_id))
         if prev_month_start <= wd <= prev_month_end:
             monthly_counts_by_pid[w["participant_id"]] += 1
 
@@ -128,8 +129,9 @@ def process_data(participants, counts, consecutive, workouts):
         dates_list = []
         recent_weeks = set()
 
-        for wd, shift in workouts_by_pid.get(pid, []):
-            shift_counts[shift] += 1
+        for wd, shift, has_msg_id in workouts_by_pid.get(pid, []):
+            if has_msg_id:
+                shift_counts[shift] += 1
             dates_list.append(wd)
             week = wd.isocalendar()[:2]
             if week in total_recent_weeks:

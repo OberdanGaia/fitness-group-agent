@@ -366,10 +366,14 @@ def generate_html(data: dict) -> str:
   .badge.on-pace{{background:#dcfce7;color:#166534}}
   .badge.behind{{background:#fef9c3;color:#854d0e}}
 
-  /* Charts */
-  .charts{{display:grid;grid-template-columns:2fr 1fr;gap:22px;margin-bottom:22px}}
-  .chart-box{{background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07)}}
-  .chart-box h2{{font-size:13px;font-weight:700;color:#334155;margin-bottom:18px;text-transform:uppercase;letter-spacing:.5px;border-left:3px solid #0ea5e9;padding-left:10px}}
+  /* Tab navigation */
+  .tab-bar{{background:linear-gradient(135deg,#1e3a5f,#0ea5e9);border-radius:14px;padding:6px;display:flex;gap:4px;margin-bottom:20px}}
+  .tab-btn{{flex:1;border:none;background:transparent;color:rgba(255,255,255,.75);border-radius:10px;padding:11px 8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;line-height:1.3;text-align:center}}
+  .tab-btn.active{{background:#fff;color:#1e3a5f;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.15)}}
+  .tab-btn:not(.active):hover{{background:rgba(255,255,255,.15);color:#fff}}
+  .tab-panel{{display:none}}
+  .tab-panel.active{{display:block}}
+  .doughnut-wrap{{max-width:380px;margin:0 auto}}
 
   footer{{text-align:center;font-size:12px;color:#94a3b8;padding:20px}}
 
@@ -388,9 +392,8 @@ def generate_html(data: dict) -> str:
     .kpi .kpi-desc{{font-size:9px}}
     section{{padding:14px 10px;margin-bottom:12px}}
     section h2{{font-size:11px;margin-bottom:12px}}
-    .charts{{grid-template-columns:1fr;gap:12px;margin-bottom:12px}}
-    .chart-box{{padding:14px 10px}}
-    .chart-box h2{{font-size:11px;margin-bottom:10px}}
+    .tab-bar{{margin-bottom:14px}}
+    .tab-btn{{font-size:11px;padding:9px 4px}}
     .table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -10px;padding:0 10px}}
     table{{font-size:12px;min-width:640px}}
     th{{padding:8px 10px;font-size:10px}}
@@ -454,53 +457,71 @@ def generate_html(data: dict) -> str:
     </div>
   </div>
 
-  <!-- Ranking -->
-  <section>
-    <h2>Ranking dos participantes</h2>
-    <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="center">#</th>
-          <th>Nome</th>
-          <th class="center">Treinos</th>
-          <th>Progresso</th>
-          <th class="center">Ritmo</th>
-          <th class="center">Turno fav.</th>
-          <th class="center">Streak atual</th>
-          <th class="center">Maior streak</th>
-          <th class="center">Consistência</th>
-        </tr>
-      </thead>
-      <tbody>{rows}
-      </tbody>
-    </table>
-    </div>
-  </section>
-
-  <!-- Charts row 1 -->
-  <div class="charts">
-    <div class="chart-box">
-      <h2>Treinos por semana — últimas 8 semanas</h2>
-      <canvas id="weeklyChart" height="110"></canvas>
-    </div>
-    <div class="chart-box">
-      <h2>Distribuição por turno</h2>
-      <canvas id="shiftChart"></canvas>
-    </div>
+  <!-- Tab navigation -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="setTab(0)">Tabela</button>
+    <button class="tab-btn" onclick="setTab(1)">Por semana</button>
+    <button class="tab-btn" onclick="setTab(2)">Por turno</button>
+    <button class="tab-btn" onclick="setTab(3)">Por dia da semana</button>
   </div>
 
-  <!-- Charts row 2 -->
-  <section>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <h2 style="margin-bottom:0">Treinos por dia da semana</h2>
-      <select id="dowFilter" onchange="updateDowChart()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;color:#334155;background:#f8fafc;cursor:pointer">
-        <option value="__grupo__">Grupo inteiro</option>
-        {''.join(f'<option value="{name}">{name}</option>' for name in data['participant_names'])}
-      </select>
-    </div>
-    <canvas id="dowChart" height="70"></canvas>
-  </section>
+  <!-- Panel 0: Ranking -->
+  <div class="tab-panel active" id="panel-0">
+    <section>
+      <h2>Ranking dos participantes</h2>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="center">#</th>
+            <th>Nome</th>
+            <th class="center">Treinos</th>
+            <th>Progresso</th>
+            <th class="center">Ritmo</th>
+            <th class="center">Turno fav.</th>
+            <th class="center">Streak atual</th>
+            <th class="center">Maior streak</th>
+            <th class="center">Consistência</th>
+          </tr>
+        </thead>
+        <tbody>{rows}
+        </tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Panel 1: Por semana -->
+  <div class="tab-panel" id="panel-1">
+    <section>
+      <h2>Treinos por semana — últimas 8 semanas</h2>
+      <canvas id="weeklyChart" height="100"></canvas>
+    </section>
+  </div>
+
+  <!-- Panel 2: Por turno -->
+  <div class="tab-panel" id="panel-2">
+    <section>
+      <h2>Distribuição por turno</h2>
+      <div class="doughnut-wrap">
+        <canvas id="shiftChart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <!-- Panel 3: Por dia da semana -->
+  <div class="tab-panel" id="panel-3">
+    <section>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+        <h2 style="margin-bottom:0">Treinos por dia da semana</h2>
+        <select id="dowFilter" onchange="updateDowChart()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;color:#334155;background:#f8fafc;cursor:pointer">
+          <option value="__grupo__">Grupo inteiro</option>
+          {''.join(f'<option value="{name}">{name}</option>' for name in data['participant_names'])}
+        </select>
+      </div>
+      <canvas id="dowChart" height="70"></canvas>
+    </section>
+  </div>
 
 </div>
 
@@ -515,13 +536,13 @@ const dowLabels        = {dow_json};
 const dowPctGroup      = {dow_pct_group_json};
 const dowByParticipant = {dow_by_part_json};
 
-new Chart(document.getElementById('weeklyChart'), {{
+const weeklyChart = new Chart(document.getElementById('weeklyChart'), {{
   type: 'bar',
   data: {{ labels: weeklyLabels, datasets: [{{ label: 'Treinos', data: weeklyValues, backgroundColor: '#0ea5e9', borderRadius: 6 }}] }},
   options: {{ plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true, ticks: {{ stepSize: 1 }} }} }} }}
 }});
 
-new Chart(document.getElementById('shiftChart'), {{
+const shiftChart = new Chart(document.getElementById('shiftChart'), {{
   type: 'doughnut',
   data: {{ labels: shiftLabels, datasets: [{{ data: shiftValues, backgroundColor: ['#f59e0b','#0ea5e9','#6366f1','#94a3b8'], borderWidth: 0 }}] }},
   options: {{ plugins: {{ legend: {{ position: 'bottom' }} }}, cutout: '60%' }}
@@ -535,6 +556,14 @@ const dowChart = new Chart(document.getElementById('dowChart'), {{
     scales: {{ y: {{ beginAtZero: true, max: 100, ticks: {{ callback: v => v + '%' }} }} }}
   }}
 }});
+
+function setTab(i) {{
+  document.querySelectorAll('.tab-btn').forEach((b, j) => b.classList.toggle('active', i === j));
+  document.querySelectorAll('.tab-panel').forEach((p, j) => p.classList.toggle('active', i === j));
+  if (i === 1) weeklyChart.resize();
+  if (i === 2) shiftChart.resize();
+  if (i === 3) dowChart.resize();
+}}
 
 function updateDowChart() {{
   const key = document.getElementById('dowFilter').value;

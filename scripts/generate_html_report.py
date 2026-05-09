@@ -20,6 +20,8 @@ from app.db.client import get_supabase
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports", "relatorio_fitness2026.html")
 
+BOT_START_DATE = date(2026, 5, 1)
+
 MONTHS_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
     5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
@@ -181,12 +183,38 @@ def process_data(participants, counts, consecutive, workouts):
     shift_labels = [shift_map.get(s, s) for s in shift_total]
     shift_values = list(shift_total.values())
 
-    # Day of week
-    dow_counts = defaultdict(int)
+    # Day of week — percentages from BOT_START_DATE, bot-captured only
+    dow_occurrences = [0] * 7
+    cur = BOT_START_DATE
+    while cur <= today:
+        dow_occurrences[cur.weekday()] += 1
+        cur += timedelta(days=1)
+
+    n_participants = len(participants)
+    dow_counts_group = defaultdict(int)
+    dow_counts_by_pid = defaultdict(lambda: defaultdict(int))
     for w in workouts:
-        dow_counts[date.fromisoformat(w["workout_date"]).weekday()] += 1
+        wd = date.fromisoformat(w["workout_date"])
+        has_msg_id = bool(w.get("photo_message_id") or w.get("text_message_id"))
+        if has_msg_id and wd >= BOT_START_DATE:
+            dow = wd.weekday()
+            dow_counts_group[dow] += 1
+            dow_counts_by_pid[w["participant_id"]][dow] += 1
+
     dow_labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-    dow_values = [dow_counts[i] for i in range(7)]
+    dow_pct_group = [
+        round(dow_counts_group[i] / (dow_occurrences[i] * n_participants) * 100)
+        if dow_occurrences[i] > 0 else 0
+        for i in range(7)
+    ]
+    dow_by_participant = {}
+    for p in participants:
+        pid = p["id"]
+        dow_by_participant[p["name"]] = [
+            round(dow_counts_by_pid[pid][i] / dow_occurrences[i] * 100)
+            if dow_occurrences[i] > 0 else 0
+            for i in range(7)
+        ]
 
     return {
         "today": today.strftime("%d/%m/%Y"),
@@ -207,7 +235,9 @@ def process_data(participants, counts, consecutive, workouts):
         "shift_labels": shift_labels,
         "shift_values": shift_values,
         "dow_labels": dow_labels,
-        "dow_values": dow_values,
+        "dow_pct_group": dow_pct_group,
+        "dow_by_participant": dow_by_participant,
+        "participant_names": [p["name"] for p in participants],
     }
 
 
@@ -252,8 +282,10 @@ def generate_html(data: dict) -> str:
     weekly_val     = json.dumps(data["weekly_values"])
     shift_json     = json.dumps(data["shift_labels"])
     shift_val      = json.dumps(data["shift_values"])
-    dow_json       = json.dumps(data["dow_labels"])
-    dow_val        = json.dumps(data["dow_values"])
+    dow_json           = json.dumps(data["dow_labels"])
+    dow_pct_group_json = json.dumps(data["dow_pct_group"])
+    dow_by_part_json   = json.dumps(data["dow_by_participant"])
+    participant_names_json = json.dumps(data["participant_names"])
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -397,7 +429,13 @@ def generate_html(data: dict) -> str:
 
   <!-- Charts row 2 -->
   <section>
-    <h2>Treinos por dia da semana</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h2 style="margin-bottom:0">Treinos por dia da semana</h2>
+      <select id="dowFilter" onchange="updateDowChart()" style="font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;color:#334155;background:#f8fafc;cursor:pointer">
+        <option value="__grupo__">Grupo inteiro</option>
+        {''.join(f'<option value="{name}">{name}</option>' for name in data['participant_names'])}
+      </select>
+    </div>
     <canvas id="dowChart" height="70"></canvas>
   </section>
 
@@ -410,8 +448,9 @@ const weeklyLabels = {weekly_json};
 const weeklyValues = {weekly_val};
 const shiftLabels  = {shift_json};
 const shiftValues  = {shift_val};
-const dowLabels    = {dow_json};
-const dowValues    = {dow_val};
+const dowLabels        = {dow_json};
+const dowPctGroup      = {dow_pct_group_json};
+const dowByParticipant = {dow_by_part_json};
 
 new Chart(document.getElementById('weeklyChart'), {{
   type: 'bar',
@@ -425,11 +464,21 @@ new Chart(document.getElementById('shiftChart'), {{
   options: {{ plugins: {{ legend: {{ position: 'bottom' }} }}, cutout: '60%' }}
 }});
 
-new Chart(document.getElementById('dowChart'), {{
+const dowChart = new Chart(document.getElementById('dowChart'), {{
   type: 'bar',
-  data: {{ labels: dowLabels, datasets: [{{ label: 'Treinos', data: dowValues, backgroundColor: '#6366f1', borderRadius: 6 }}] }},
-  options: {{ plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true, ticks: {{ stepSize: 1 }} }} }} }}
+  data: {{ labels: dowLabels, datasets: [{{ label: '% de aproveitamento', data: dowPctGroup, backgroundColor: '#6366f1', borderRadius: 6 }}] }},
+  options: {{
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{ y: {{ beginAtZero: true, max: 100, ticks: {{ callback: v => v + '%' }} }} }}
+  }}
 }});
+
+function updateDowChart() {{
+  const key = document.getElementById('dowFilter').value;
+  const data = key === '__grupo__' ? dowPctGroup : (dowByParticipant[key] || dowPctGroup);
+  dowChart.data.datasets[0].data = data;
+  dowChart.update();
+}}
 </script>
 </body>
 </html>"""

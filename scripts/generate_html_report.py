@@ -344,16 +344,16 @@ def generate_html(data: dict) -> str:
     <div class="kpi orange">
       <span class="kpi-icon">🔥</span>
       <span class="kpi-lbl">Maior streak histórico</span>
-      <span class="kpi-desc">Maior sequência de dias consecutivos treinados</span>
       <span class="kpi-val">{data['best_streak_days']} dias</span>
       <span class="kpi-sub">{data['best_streak_name']}</span>
+      <span class="kpi-desc">Maior sequência de dias consecutivos treinados</span>
     </div>
     <div class="kpi pink">
       <span class="kpi-icon">🏆</span>
       <span class="kpi-lbl">Atleta de {data['athlete_month']}</span>
-      <span class="kpi-desc">Quem mais treinou no mês anterior</span>
       <span class="kpi-val">{data['athlete_count']} treinos</span>
       <span class="kpi-sub">{data['athlete_name']}</span>
+      <span class="kpi-desc">Quem mais treinou no mês anterior</span>
     </div>
   </div>
 

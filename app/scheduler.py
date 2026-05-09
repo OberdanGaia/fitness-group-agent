@@ -12,23 +12,29 @@ _scheduler = AsyncIOScheduler()
 
 def start() -> None:
     tz = pytz.timezone(settings.timezone)
-    _scheduler.add_job(
-        _run_weekly_report,
-        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=tz),
-        id="weekly_report",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
-        _run_monthly_report,
-        CronTrigger(day=1, hour=7, minute=0, timezone=tz),
-        id="monthly_report",
-        replace_existing=True,
-    )
+    if settings.weekly_report_enabled:
+        _scheduler.add_job(
+            _run_weekly_report,
+            CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=tz),
+            id="weekly_report",
+            replace_existing=True,
+        )
+        logger.info("Weekly report scheduled — Monday 09:00 %s → Oberdan private", settings.timezone)
+    else:
+        logger.info("Weekly report DISABLED (WEEKLY_REPORT_ENABLED=false)")
+
+    if settings.monthly_report_enabled:
+        _scheduler.add_job(
+            _run_monthly_report,
+            CronTrigger(day=1, hour=7, minute=0, timezone=tz),
+            id="monthly_report",
+            replace_existing=True,
+        )
+        logger.info("Monthly report scheduled — day 1 07:00 %s → group", settings.timezone)
+    else:
+        logger.info("Monthly report DISABLED (MONTHLY_REPORT_ENABLED=false)")
+
     _scheduler.start()
-    logger.info(
-        "Scheduler started — weekly report: Monday 09:00 %s | monthly report: day 1 07:00 %s",
-        settings.timezone, settings.timezone,
-    )
 
 
 def stop() -> None:

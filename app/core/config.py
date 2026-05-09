@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     timezone: str = "America/Sao_Paulo"
     debug: bool = False
     silent_mode: bool = False
+    weekly_report_enabled: bool = True
+    monthly_report_enabled: bool = True
 
     class Config:
         env_file = ".env"

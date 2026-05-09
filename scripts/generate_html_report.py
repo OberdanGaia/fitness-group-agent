@@ -49,7 +49,7 @@ def fetch_data():
     while True:
         batch = (
             supabase.table("workouts")
-            .select("participant_id,workout_date,shift")
+            .select("participant_id,workout_date,shift,photo_message_id,text_message_id")
             .eq("is_valid", True)
             .is_("deleted_at", "null")
             .range(offset, offset + 999)
@@ -170,10 +170,11 @@ def process_data(participants, counts, consecutive, workouts):
     weekly_labels = [w.strftime("%d/%m") for w in weeks_sorted]
     weekly_values = [weekly_counts[w] for w in weeks_sorted]
 
-    # Shift distribution
+    # Shift distribution — apenas treinos capturados pelo bot (com message_id)
     shift_total = defaultdict(int)
     for w in workouts:
-        shift_total[w["shift"]] += 1
+        if w.get("photo_message_id") or w.get("text_message_id"):
+            shift_total[w["shift"]] += 1
     shift_map = {"manha": "Manhã", "tarde": "Tarde", "noite": "Noite", "madrugada": "Madrugada"}
     shift_labels = [shift_map.get(s, s) for s in shift_total]
     shift_values = list(shift_total.values())

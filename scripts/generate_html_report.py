@@ -403,6 +403,7 @@ def generate_html(data: dict) -> str:
     .bar-wrap{{min-width:70px}}
     .badge{{padding:2px 7px;font-size:10px}}
     footer{{font-size:11px;padding:14px}}
+    #weeklyChart,#dowChart{{min-height:260px}}
   }}
 </style>
 </head>
@@ -539,7 +540,7 @@ const dowByParticipant = {dow_by_part_json};
 const weeklyChart = new Chart(document.getElementById('weeklyChart'), {{
   type: 'bar',
   data: {{ labels: weeklyLabels, datasets: [{{ label: 'Treinos', data: weeklyValues, backgroundColor: '#0ea5e9', borderRadius: 6 }}] }},
-  options: {{ plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true, ticks: {{ stepSize: 1 }} }} }} }}
+  options: {{ maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true, ticks: {{ stepSize: 1 }} }} }} }}
 }});
 
 const shiftChart = new Chart(document.getElementById('shiftChart'), {{
@@ -552,6 +553,7 @@ const dowChart = new Chart(document.getElementById('dowChart'), {{
   type: 'bar',
   data: {{ labels: dowLabels, datasets: [{{ label: '% de aproveitamento', data: dowPctGroup, backgroundColor: '#6366f1', borderRadius: 6 }}] }},
   options: {{
+    maintainAspectRatio: false,
     plugins: {{ legend: {{ display: false }} }},
     scales: {{ y: {{ beginAtZero: true, max: 100, ticks: {{ callback: v => v + '%' }} }} }}
   }}

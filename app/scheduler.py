@@ -45,6 +45,7 @@ def stop() -> None:
 async def _run_weekly_report() -> None:
     from app.db.repositories import report_repo
     from app.services import report_service, whatsapp_service
+    from app.services.report_service import ReportError
 
     logger.info("Running scheduled weekly report → sending to Oberdan private")
     try:
@@ -52,8 +53,18 @@ async def _run_weekly_report() -> None:
         await whatsapp_service.send_private_message(settings.oberdan_phone, report_text)
         if saved:
             report_repo.mark_sent(saved["id"])
+    except ReportError as e:
+        logger.error("Weekly report error (service=%s): %s", e.service, e)
+        await whatsapp_service.send_private_message(
+            settings.oberdan_phone,
+            f"⚠️ Erro no relatório semanal automático — serviço indisponível: {e.service}. Tente manualmente com #relatorio.",
+        )
     except Exception:
         logger.exception("Failed to run scheduled weekly report")
+        await whatsapp_service.send_private_message(
+            settings.oberdan_phone,
+            "⚠️ Erro inesperado no relatório semanal automático. Verifique os logs no Railway ou tente manualmente com #relatorio.",
+        )
 
 
 async def _run_monthly_report() -> None:

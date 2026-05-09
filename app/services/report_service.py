@@ -90,7 +90,7 @@ def _build_prompt(ranking: list[dict], last_snapshot: Optional[list]) -> str:
     ranking_text = "\n".join(ranking_lines)
 
     on_fire_entries = sorted(
-        [(r["name"], r["consecutive_days"]) for r in ranking if r.get("consecutive_days", 0) >= 2],
+        [(r["name"], r["consecutive_days"]) for r in ranking if r.get("consecutive_days", 0) >= 7],
         key=lambda x: x[1],
         reverse=True,
     )

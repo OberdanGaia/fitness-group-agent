@@ -14,9 +14,16 @@ from calendar import monthrange
 from datetime import date, timedelta
 from collections import defaultdict
 
-from app.core.config import settings
+from supabase import create_client, Client
 from app.core.constants import CHALLENGE_START, CHALLENGE_END, CHALLENGE_DAYS, GOAL
-from app.db.client import get_supabase
+
+
+def get_supabase() -> Client:
+    url = os.environ.get("SUPABASE_URL", "")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY devem estar definidos")
+    return create_client(url, key)
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports", "relatorio_fitness2026.html")
 
@@ -302,6 +309,31 @@ def generate_html(data: dict) -> str:
   header h1{{font-size:24px;font-weight:700}}
   header p{{opacity:.85;font-size:13px;margin-top:4px}}
   header .date-badge{{background:rgba(255,255,255,.15);border-radius:99px;padding:6px 16px;font-size:13px;white-space:nowrap}}
+  .view-toggle{{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:99px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .2s;white-space:nowrap}}
+  .view-toggle:hover{{background:rgba(255,255,255,.25)}}
+
+  /* Mobile view */
+  body.mobile-view .container{{max-width:430px;padding:16px 12px}}
+  body.mobile-view .kpis{{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}}
+  body.mobile-view .kpi{{padding:16px 12px}}
+  body.mobile-view .kpi .kpi-val{{font-size:22px}}
+  body.mobile-view .kpi .kpi-lbl{{font-size:10px}}
+  body.mobile-view .kpi .kpi-sub{{font-size:11px}}
+  body.mobile-view .kpi .kpi-desc{{font-size:9px}}
+  body.mobile-view section{{padding:16px 12px;margin-bottom:14px}}
+  body.mobile-view section h2{{font-size:12px;margin-bottom:14px}}
+  body.mobile-view .charts{{grid-template-columns:1fr;gap:14px;margin-bottom:14px}}
+  body.mobile-view .chart-box{{padding:16px 12px}}
+  body.mobile-view .chart-box h2{{font-size:12px;margin-bottom:12px}}
+  body.mobile-view .table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch}}
+  body.mobile-view table{{font-size:12px;min-width:600px}}
+  body.mobile-view th,body.mobile-view td{{padding:9px 8px}}
+  body.mobile-view td.name{{position:sticky;left:0;background:#fff;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06)}}
+  body.mobile-view tr:hover td.name{{background:#f8fafc}}
+  body.mobile-view .bar-wrap{{min-width:70px}}
+  body.mobile-view header{{padding:20px 16px}}
+  body.mobile-view header h1{{font-size:18px}}
+  body.mobile-view footer{{font-size:11px;padding:14px}}
 
   .container{{max-width:1300px;margin:0 auto;padding:28px 20px}}
 
@@ -352,7 +384,10 @@ def generate_html(data: dict) -> str:
     <h1>🏋️ Perde treino, perde dinheiro 2026</h1>
     <p>Dashboard do grupo — atualizado em {data['today']}</p>
   </div>
-  <div class="date-badge">📅 {data['days_remaining']} dias restantes</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="date-badge">📅 {data['days_remaining']} dias restantes</div>
+    <button class="view-toggle" id="viewToggleBtn" onclick="toggleView()">📱 Ver no celular</button>
+  </div>
 </header>
 
 <div class="container">
@@ -396,6 +431,7 @@ def generate_html(data: dict) -> str:
   <!-- Ranking -->
   <section>
     <h2>Ranking dos participantes</h2>
+    <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -413,6 +449,7 @@ def generate_html(data: dict) -> str:
       <tbody>{rows}
       </tbody>
     </table>
+    </div>
   </section>
 
   <!-- Charts row 1 -->
@@ -478,6 +515,11 @@ function updateDowChart() {{
   const data = key === '__grupo__' ? dowPctGroup : (dowByParticipant[key] || dowPctGroup);
   dowChart.data.datasets[0].data = data;
   dowChart.update();
+}}
+
+function toggleView() {{
+  const isMobile = document.body.classList.toggle('mobile-view');
+  document.getElementById('viewToggleBtn').textContent = isMobile ? '🖥️ Ver no computador' : '📱 Ver no celular';
 }}
 </script>
 </body>

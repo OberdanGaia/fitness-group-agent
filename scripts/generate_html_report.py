@@ -366,6 +366,8 @@ def generate_html(data: dict) -> str:
   .badge.on-pace{{background:#dcfce7;color:#166534}}
   .badge.behind{{background:#fef9c3;color:#854d0e}}
 
+  .chart-wrap{{position:relative;height:320px}}
+
   /* Tab navigation */
   .tab-bar{{background:linear-gradient(135deg,#1e3a5f,#0ea5e9);border-radius:14px;padding:6px;display:flex;gap:4px;margin-bottom:20px}}
   .tab-btn{{flex:1;border:none;background:transparent;color:rgba(255,255,255,.75);border-radius:10px;padding:11px 8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;line-height:1.3;text-align:center}}
@@ -403,7 +405,7 @@ def generate_html(data: dict) -> str:
     .bar-wrap{{min-width:70px}}
     .badge{{padding:2px 7px;font-size:10px}}
     footer{{font-size:11px;padding:14px}}
-    #weeklyChart,#dowChart{{min-height:260px}}
+    .chart-wrap{{height:260px}}
   }}
 </style>
 </head>
@@ -496,7 +498,7 @@ def generate_html(data: dict) -> str:
   <div class="tab-panel" id="panel-1">
     <section>
       <h2>Treinos por semana — últimas 8 semanas</h2>
-      <canvas id="weeklyChart" height="100"></canvas>
+      <div class="chart-wrap"><canvas id="weeklyChart"></canvas></div>
     </section>
   </div>
 
@@ -520,7 +522,7 @@ def generate_html(data: dict) -> str:
           {''.join(f'<option value="{name}">{name}</option>' for name in data['participant_names'])}
         </select>
       </div>
-      <canvas id="dowChart" height="70"></canvas>
+      <div class="chart-wrap"><canvas id="dowChart"></canvas></div>
     </section>
   </div>
 

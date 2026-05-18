@@ -28,6 +28,14 @@ async def handle_incoming_message(payload: dict, remote_jid: str = None) -> None
     is_private = remote_jid and remote_jid != settings.group_jid
     reply_phone = participant["phone"] if is_private else None
 
+    # Handle pending #add-treino confirmation (s/n) before anything else
+    if is_private and participant.get("is_admin") and admin_handler.has_pending_confirmation(sender_phone):
+        for text in message_parser.extract_text_candidates(message_data):
+            answer = text.strip().lower()
+            if answer in ("s", "n"):
+                await admin_handler.handle_confirmation(sender_phone, answer, reply_phone)
+                return
+
     # Route admin commands before workout processing
     if participant.get("is_admin"):
         for text in message_parser.extract_text_candidates(message_data):

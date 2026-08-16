@@ -17,7 +17,8 @@ async def evolution_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Invalid secret")
 
     payload = await request.json()
-    event = payload.get("event")
+    # Normalize event format: Evolution API sends MESSAGES_UPSERT or messages.upsert depending on version
+    event = (payload.get("event") or "").lower().replace("_", ".")
 
     if event == "messages.delete":
         _handle_message_delete(payload)

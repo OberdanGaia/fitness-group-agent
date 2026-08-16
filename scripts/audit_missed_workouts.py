@@ -19,7 +19,7 @@ from app.core.config import settings
 from app.db.client import get_supabase
 from app.services.message_parser import extract_sequence_number, extract_text_candidates, get_shift
 
-WINDOW_DAYS = 30
+WINDOW_DAYS = 90
 BR_TZ = pytz.timezone("America/Sao_Paulo")
 
 
@@ -99,7 +99,7 @@ def main():
 
     print("Buscando mensagens do grupo via Evolution API...")
     try:
-        messages = fetch_recent_messages()
+        messages = fetch_recent_messages(limit=5000)
     except Exception as e:
         print(f"Erro ao buscar mensagens: {e}")
         sys.exit(1)

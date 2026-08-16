@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Request, HTTPException
@@ -8,6 +9,8 @@ from app.db.repositories import workout_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_background_tasks: set = set()
 
 
 @router.post("/webhook/evolution")
@@ -45,10 +48,9 @@ async def evolution_webhook(request: Request):
         return {"status": "ignored"}
 
     # Fire and forget — return 200 immediately so Evolution API doesn't retry
-    try:
-        await handle_incoming_message(payload, remote_jid=remote_jid)
-    except Exception:
-        logger.exception("Unhandled error processing webhook")
+    task = asyncio.create_task(handle_incoming_message(payload, remote_jid=remote_jid))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return {"status": "ok"}
 
